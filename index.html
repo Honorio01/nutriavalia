@@ -1326,6 +1326,20 @@
         <select id="imc-turma-filter" onchange="renderImcTab()">
           <option value="">Todas as Turmas</option>
         </select>
+        <select id="imc-sexo-filter" onchange="renderImcTab()">
+          <option value="">Ambos os Sexos</option>
+          <option value="M">👦 Meninos</option>
+          <option value="F">👧 Meninas</option>
+        </select>
+        <select id="imc-idade-filter" onchange="renderImcTab()">
+          <option value="">Todas as Idades</option>
+          <option value="0-4">0 a 4 anos (Pré-escolar)</option>
+          <option value="5-7">5 a 7 anos</option>
+          <option value="8-10">8 a 10 anos</option>
+          <option value="11-13">11 a 13 anos</option>
+          <option value="14-17">14 a 17 anos</option>
+          <option value="18-99">18+ anos</option>
+        </select>
         <select id="imc-classificacao-filter" onchange="renderImcTab()" style="display:none;">
           <option value="">Todas as Classificações</option>
           <option value="Magreza acentuada">🔴 Magreza acentuada</option>
@@ -2801,8 +2815,18 @@ function getFilteredCriancas() {
   let list = getVisibleCriancas();
   const escolaFil = document.getElementById('imc-escola-filter').value;
   const turmaFil = document.getElementById('imc-turma-filter').value;
+  const sexoFil = document.getElementById('imc-sexo-filter')?.value || '';
+  const idadeFil = document.getElementById('imc-idade-filter')?.value || '';
   if (escolaFil) list = list.filter(c => c.escola_id === escolaFil);
   if (turmaFil) list = list.filter(c => c.turma_id === turmaFil);
+  if (sexoFil) list = list.filter(c => c.sexo === sexoFil);
+  if (idadeFil) {
+    const [min, max] = idadeFil.split('-').map(Number);
+    list = list.filter(c => {
+      const idade = calcAge(c.data_nascimento);
+      return idade >= min && idade <= max;
+    });
+  }
   return list;
 }
 
@@ -2839,12 +2863,13 @@ function renderCriancasLista() {
   if (classFil) filtered = filtered.filter(c => c.classif && c.classif.label === classFil);
 
   const el = document.getElementById('imc-content');
+  const banner = getImcFiltersBanner();
   if (!filtered.length) {
-    el.innerHTML = `<div class="card"><div class="empty-state"><div class="empty-state-icon">👶</div><div class="empty-state-title">Nenhuma criança encontrada</div><div class="empty-state-msg">Cadastre crianças ou ajuste os filtros.</div></div></div>`;
+    el.innerHTML = banner + `<div class="card"><div class="empty-state"><div class="empty-state-icon">👶</div><div class="empty-state-title">Nenhuma criança encontrada</div><div class="empty-state-msg">Cadastre crianças ou ajuste os filtros.</div></div></div>`;
     return;
   }
 
-  el.innerHTML = `<div class="card"><div class="table-wrapper"><table>
+  el.innerHTML = banner + `<div class="card"><div class="table-wrapper"><table>
     <thead><tr><th>Nome</th><th>Sexo</th><th>Idade</th><th>Turma</th><th>Última Medição</th><th>Peso/Altura</th><th>IMC</th><th>Classificação</th><th>Ações</th></tr></thead>
     <tbody>
     ${filtered.map(c => {
@@ -3003,6 +3028,83 @@ function limparLancamentoRapido() {
   document.getElementById('rapid-nome').focus();
 }
 
+// ── Banner de filtros ativos no IMC ──
+function getImcFiltersBanner() {
+  const escolaId = document.getElementById('imc-escola-filter')?.value;
+  const turmaId = document.getElementById('imc-turma-filter')?.value;
+  const sexo = document.getElementById('imc-sexo-filter')?.value;
+  const idade = document.getElementById('imc-idade-filter')?.value;
+  const tags = [];
+  if (escolaId) { const e=(cache.escolas||[]).find(e=>e.id===escolaId); if(e) tags.push(`🏫 ${e.nome}`); }
+  if (turmaId) { const t=(cache.turmas||[]).find(t=>t.id===turmaId); if(t) tags.push(`👨‍👩‍👧 ${t.nome} (${t.turno})`); }
+  if (sexo) tags.push(sexo === 'M' ? '👦 Meninos' : '👧 Meninas');
+  if (idade) tags.push(`🎂 ${idade.replace('-',' a ')} anos`);
+  if (!tags.length) return '';
+  return `<div style="background:var(--primary-light);border:2px solid var(--primary);border-radius:12px;padding:10px 14px;margin-bottom:1rem;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+    <strong style="color:var(--primary-dark);font-size:0.82rem;">🔍 Filtros ativos:</strong>
+    ${tags.map(t=>`<span style="background:white;padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:600;color:var(--primary-dark);">${t}</span>`).join('')}
+  </div>`;
+}
+
+// ── Card comparativo por sexo ──
+function getComparativoSexoCard(enriched) {
+  const meninos = enriched.filter(c => c.sexo === 'M');
+  const meninas = enriched.filter(c => c.sexo === 'F');
+  if (!meninos.length || !meninas.length) return ''; // só mostra se tiver os dois
+
+  function calcDistrib(group) {
+    const counts = {};
+    group.forEach(c => { counts[c.classif.label] = (counts[c.classif.label]||0) + 1; });
+    return counts;
+  }
+  const distM = calcDistrib(meninos);
+  const distF = calcDistrib(meninas);
+  const allLabels = [...new Set([...Object.keys(distM), ...Object.keys(distF)])];
+
+  function classColor(label, group) {
+    const c = group.find(c => c.classif.label === label);
+    return c ? c.classif.color : '#999';
+  }
+
+  function classRows(dist, group, total) {
+    return allLabels.map(label => {
+      const c = dist[label] || 0;
+      const color = classColor(label, group);
+      const pct = total ? Math.round(c/total*100) : 0;
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <div style="width:10px;height:10px;border-radius:3px;background:${color}"></div>
+        <span style="flex:1;font-size:0.78rem;font-weight:600;">${label}</span>
+        <span style="font-weight:700;color:${color};font-size:0.85rem;">${c}</span>
+        <span style="color:var(--text3);font-size:0.72rem;min-width:38px;text-align:right;">${pct}%</span>
+      </div>`;
+    }).join('');
+  }
+
+  return `<div class="card" style="margin-bottom:1.5rem">
+    <div class="card-header"><div class="card-title">⚖️ Comparativo por Sexo</div></div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+        <div style="background:#E3F2FD;border-radius:12px;padding:1rem;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:0.8rem;border-bottom:2px solid #1565C0;padding-bottom:6px;">
+            <span style="font-size:1.5rem;">👦</span>
+            <strong style="color:#1565C0;font-size:0.95rem;">Meninos</strong>
+            <span style="margin-left:auto;background:#1565C0;color:white;padding:2px 10px;border-radius:20px;font-size:0.78rem;font-weight:700;">${meninos.length}</span>
+          </div>
+          ${classRows(distM, enriched, meninos.length)}
+        </div>
+        <div style="background:#FCE4EC;border-radius:12px;padding:1rem;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:0.8rem;border-bottom:2px solid #C2185B;padding-bottom:6px;">
+            <span style="font-size:1.5rem;">👧</span>
+            <strong style="color:#C2185B;font-size:0.95rem;">Meninas</strong>
+            <span style="margin-left:auto;background:#C2185B;color:white;padding:2px 10px;border-radius:20px;font-size:0.78rem;font-weight:700;">${meninas.length}</span>
+          </div>
+          ${classRows(distF, enriched, meninas.length)}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
 // ── ABA 3: Relatório da turma ──
 let chartImcPie = null;
 function renderImcRelatorio() {
@@ -3016,9 +3118,10 @@ function renderImcRelatorio() {
     return { ...c, imc, classif, last, age };
   }).filter(Boolean);
 
+  const banner = getImcFiltersBanner();
   const el = document.getElementById('imc-content');
   if (!enriched.length) {
-    el.innerHTML = `<div class="card"><div class="empty-state"><div class="empty-state-icon">📊</div><div class="empty-state-msg">Sem medições registradas para os filtros selecionados.</div></div></div>`;
+    el.innerHTML = banner + `<div class="card"><div class="empty-state"><div class="empty-state-icon">📊</div><div class="empty-state-msg">Sem medições registradas para os filtros selecionados.</div></div></div>`;
     return;
   }
 
@@ -3029,14 +3132,36 @@ function renderImcRelatorio() {
   const data = labels.map(l => groups[l]);
   const colors = labels.map(l => enriched.find(c => c.classif.label === l).classif.color);
 
-  el.innerHTML = `
+  // Stats
+  const meninos = enriched.filter(c => c.sexo === 'M').length;
+  const meninas = enriched.filter(c => c.sexo === 'F').length;
+
+  el.innerHTML = banner + `
+    <div class="stats-grid" style="margin-bottom:1.5rem">
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#E8F9EF">👶</div>
+        <div class="stat-value">${enriched.length}</div>
+        <div class="stat-label">Total Avaliadas</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#E3F2FD">👦</div>
+        <div class="stat-value" style="color:#1565C0">${meninos}</div>
+        <div class="stat-label">Meninos (${enriched.length?Math.round(meninos/enriched.length*100):0}%)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:#FCE4EC">👧</div>
+        <div class="stat-value" style="color:#C2185B">${meninas}</div>
+        <div class="stat-label">Meninas (${enriched.length?Math.round(meninas/enriched.length*100):0}%)</div>
+      </div>
+    </div>
+    ${getComparativoSexoCard(enriched)}
     <div class="grid-2" style="margin-bottom:1.5rem">
       <div class="card">
         <div class="card-header"><div class="card-title">🥧 Distribuição IMC</div></div>
         <div class="card-body"><div class="chart-container"><canvas id="imc-pie"></canvas></div></div>
       </div>
       <div class="card">
-        <div class="card-header"><div class="card-title">📊 Resumo</div></div>
+        <div class="card-header"><div class="card-title">📊 Resumo Geral</div></div>
         <div class="card-body">
           ${labels.map((l,i)=>`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
             <div style="width:14px;height:14px;border-radius:4px;background:${colors[i]}"></div>
