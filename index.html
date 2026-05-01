@@ -1039,11 +1039,11 @@
     <div id="login-alert" class="hidden"></div>
     <div class="form-group">
       <label>E-mail</label>
-      <input type="email" id="login-email" placeholder="seu@email.com" value="admin@nutriavalia.com">
+      <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="email">
     </div>
     <div class="form-group">
       <label>Senha</label>
-      <input type="password" id="login-senha" placeholder="••••••••" value="admin123">
+      <input type="password" id="login-senha" placeholder="••••••••" autocomplete="current-password">
     </div>
     <div class="login-forgot"><a onclick="showForgot()">Esqueci minha senha</a></div>
     <br>
@@ -1512,6 +1512,26 @@ function toSentenceCase(str) {
   const trimmed = str.trim();
   if (!trimmed) return '';
   return trimmed[0].toUpperCase() + trimmed.slice(1).toLowerCase();
+}
+
+// Capitaliza ao vivo enquanto digita (preserva posição do cursor)
+function liveCapitalizeNome(el) {
+  const cursor = el.selectionStart;
+  const original = el.value;
+  const formatted = toTitleCase(original);
+  if (formatted !== original) {
+    el.value = formatted;
+    try { el.setSelectionRange(cursor, cursor); } catch(e) {}
+  }
+}
+
+// Sentence case ao vivo (primeira letra)
+function liveCapitalizeFrase(el) {
+  if (el.value.length > 0 && el.value[0] !== el.value[0].toUpperCase()) {
+    const cursor = el.selectionStart;
+    el.value = el.value[0].toUpperCase() + el.value.slice(1);
+    try { el.setSelectionRange(cursor, cursor); } catch(e) {}
+  }
 }
 
 // ============================================================
@@ -2138,7 +2158,7 @@ function openModalCardapio(escolaId, diaSemana) {
     </div>
     <div style="display:grid;grid-template-columns:1fr auto;gap:1rem;align-items:end;">
       <div class="form-group" style="margin:0"><label>Nome do Prato</label>
-        <input type="text" id="m-nome" placeholder="Ex: Arroz com feijão" oninput="if(this.value.length===1)this.value=this.value.toUpperCase()">
+        <input type="text" id="m-nome" placeholder="Ex: Arroz com feijão" oninput="liveCapitalizeFrase(this)" onblur="this.value=toSentenceCase(this.value)">
       </div>
       <div class="form-group" style="margin:0"><label>Emoji</label>
         <input type="text" id="m-emoji" value="🍽️" maxlength="4" style="width:70px;text-align:center;font-size:1.4rem;">
@@ -2225,7 +2245,7 @@ async function openEditPrato(pratoId) {
   window._imgData = prato.foto_url || '';
   document.getElementById('modal-title').textContent = '✏️ Editar Prato';
   document.getElementById('modal-body').innerHTML = `
-    <div class="form-group"><label>Nome</label><input type="text" id="ep-nome" value="${prato.nome}" oninput="if(this.value.length===1)this.value=this.value.toUpperCase()"></div>
+    <div class="form-group"><label>Nome</label><input type="text" id="ep-nome" value="${prato.nome}" oninput="liveCapitalizeFrase(this)" onblur="this.value=toSentenceCase(this.value)"></div>
     <div class="form-group"><label>Descrição</label><textarea id="ep-desc">${prato.descricao||''}</textarea></div>
     <div class="form-group"><label>Emoji</label><input type="text" id="ep-emoji" value="${prato.emoji||'🍽️'}" maxlength="4"></div>
     <div class="form-group"><label>Foto</label>
@@ -2879,7 +2899,7 @@ function renderLancamentoRapido() {
         </div>
         <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:1rem;">
           <div class="form-group"><label>Nome da Criança</label>
-            <input type="text" id="rapid-nome" placeholder="Ex: João Silva" onblur="this.value=toTitleCase(this.value)">
+            <input type="text" id="rapid-nome" placeholder="Ex: João Silva" oninput="liveCapitalizeNome(this)" onblur="this.value=toTitleCase(this.value)">
           </div>
           <div class="form-group"><label>Sexo</label>
             <select id="rapid-sexo">
@@ -3173,7 +3193,7 @@ function openModalCrianca(id) {
   document.getElementById('modal-title').textContent = crianca ? '✏️ Editar Criança' : '👶 Cadastrar Criança';
   document.getElementById('modal-body').innerHTML = `
     <div class="form-group"><label>Nome</label>
-      <input type="text" id="cr-nome" value="${crianca?crianca.nome:''}" placeholder="Nome completo" onblur="this.value=toTitleCase(this.value)">
+      <input type="text" id="cr-nome" value="${crianca?crianca.nome:''}" placeholder="Nome completo" oninput="liveCapitalizeNome(this)" onblur="this.value=toTitleCase(this.value)">
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
       <div class="form-group" style="margin:0"><label>Sexo</label>
