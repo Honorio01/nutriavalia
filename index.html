@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<!-- saved from url=(0062)file:///C:/Users/adriano.honorio/Downloads/nutri-avalia_3.html -->
-<html lang="pt-BR"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NutriAvalia — Sistema de Avaliação Nutricional Escolar</title>
-<link href="./NutriAvalia — Sistema de Avaliação Nutricional Escolar_files/css2" rel="stylesheet">
-<script src="./NutriAvalia — Sistema de Avaliação Nutricional Escolar_files/chart.umd.min.js.download"></script>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root {
     --primary: #22C55E;          /* Verde vibrante — tom da logo */
@@ -1100,15 +1100,15 @@
 
   <!-- Nav -->
   <div id="app-nav">
-    <div class="nav-item active" data-page="dashboard" onclick="navigate(&#39;dashboard&#39;)">📊 Dashboard</div>
-    <div class="nav-item" data-page="cardapios" onclick="navigate(&#39;cardapios&#39;)">📋 Cardápios</div>
-    <div class="nav-item" data-page="votacao" onclick="navigate(&#39;votacao&#39;)">⭐ Votação</div>
-    <div class="nav-item" data-page="relatorios" onclick="navigate(&#39;relatorios&#39;)">📈 Relatórios</div>
-    <div class="nav-item" id="nav-escolas" data-page="escolas" onclick="navigate(&#39;escolas&#39;)">🏫 Escolas</div>
-    <div class="nav-item" id="nav-turmas" data-page="turmas" onclick="navigate(&#39;turmas&#39;)">👨‍👩‍👧 Turmas</div>
-    <div class="nav-item" id="nav-imc" data-page="imc" onclick="navigate(&#39;imc&#39;)">📏 IMC / Antropometria</div>
-    <div class="nav-item" id="nav-usuarios" data-page="usuarios" onclick="navigate(&#39;usuarios&#39;)">👥 Usuários</div>
-    <div class="nav-item" data-page="convites" onclick="navigate(&#39;convites&#39;)">🤝 Colaboração</div>
+    <div class="nav-item active" data-page="dashboard" onclick="navigate('dashboard')">📊 Dashboard</div>
+    <div class="nav-item" data-page="cardapios" onclick="navigate('cardapios')">📋 Cardápios</div>
+    <div class="nav-item" data-page="votacao" onclick="navigate('votacao')">⭐ Votação</div>
+    <div class="nav-item" data-page="relatorios" onclick="navigate('relatorios')">📈 Relatórios</div>
+    <div class="nav-item" id="nav-escolas" data-page="escolas" onclick="navigate('escolas')">🏫 Escolas</div>
+    <div class="nav-item" id="nav-turmas" data-page="turmas" onclick="navigate('turmas')">👨‍👩‍👧 Turmas</div>
+    <div class="nav-item" id="nav-imc" data-page="imc" onclick="navigate('imc')">📏 IMC / Antropometria</div>
+    <div class="nav-item" id="nav-usuarios" data-page="usuarios" onclick="navigate('usuarios')">👥 Usuários</div>
+    <div class="nav-item" data-page="convites" onclick="navigate('convites')">🤝 Colaboração</div>
   </div>
 
   <!-- Main -->
@@ -1240,7 +1240,7 @@
         </select>
         <select id="rel-periodo" onchange="togglePeriodoCustom();loadRelatorios()">
           <option value="today">Hoje</option>
-          <option value="week" selected="">Esta Semana</option>
+          <option value="week" selected>Esta Semana</option>
           <option value="month">Este Mês</option>
           <option value="all">Todos</option>
           <option value="custom">📅 Data Específica</option>
@@ -1254,17 +1254,17 @@
         </select>
         <div style="display:flex;gap:8px;align-items:center;">
           <span style="font-size:0.8rem;color:var(--text2);font-weight:600;">Exportar:</span>
-          <button class="btn btn-secondary btn-sm" onclick="exportReport(&#39;excel&#39;)">📊 Excel</button>
-          <button class="btn btn-outline btn-sm" onclick="exportReport(&#39;pdf&#39;)" style="color:#22C55E;border-color:#22C55E;background:#F0F8F0;">📄 PDF</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportReport('excel')">📊 Excel</button>
+          <button class="btn btn-outline btn-sm" onclick="exportReport('pdf')" style="color:#22C55E;border-color:#22C55E;background:#F0F8F0;">📄 PDF</button>
         </div>
       </div>
 
       <div class="tabs">
-        <div class="tab active" onclick="switchRelTab(&#39;geral&#39;, this)">Geral</div>
-        <div class="tab" onclick="switchRelTab(&#39;prato&#39;, this)">Por Prato</div>
-        <div class="tab" onclick="switchRelTab(&#39;diario&#39;, this)">Diário</div>
-        <div class="tab" onclick="switchRelTab(&#39;semanal&#39;, this)">Semanal</div>
-        <div class="tab" onclick="switchRelTab(&#39;mensal&#39;, this)">Mensal</div>
+        <div class="tab active" onclick="switchRelTab('geral', this)">Geral</div>
+        <div class="tab" onclick="switchRelTab('prato', this)">Por Prato</div>
+        <div class="tab" onclick="switchRelTab('diario', this)">Diário</div>
+        <div class="tab" onclick="switchRelTab('semanal', this)">Semanal</div>
+        <div class="tab" onclick="switchRelTab('mensal', this)">Mensal</div>
       </div>
 
       <div id="relatorio-content"></div>
@@ -1313,10 +1313,10 @@
       </div>
 
       <div class="tabs">
-        <div class="tab active" onclick="switchImcTab(&#39;lista&#39;, this)">👶 Crianças Cadastradas</div>
-        <div class="tab" onclick="switchImcTab(&#39;rapido&#39;, this)">⚡ Lançamento Rápido</div>
-        <div class="tab" onclick="switchImcTab(&#39;relatorio&#39;, this)">📊 Relatório da Turma</div>
-        <div class="tab" onclick="switchImcTab(&#39;evolucao&#39;, this)">📈 Evolução Individual</div>
+        <div class="tab active" onclick="switchImcTab('lista', this)">👶 Crianças Cadastradas</div>
+        <div class="tab" onclick="switchImcTab('rapido', this)">⚡ Lançamento Rápido</div>
+        <div class="tab" onclick="switchImcTab('relatorio', this)">📊 Relatório da Turma</div>
+        <div class="tab" onclick="switchImcTab('evolucao', this)">📈 Evolução Individual</div>
       </div>
 
       <div class="filter-bar" style="margin-bottom:1rem;">
@@ -1459,7 +1459,7 @@
       <button class="rej-opt" onclick="toggleRej(this)" data-val="Não conheço">❓ Não conheço</button>
     </div>
     <div style="margin-bottom:1rem;">
-      <textarea id="rej-texto" placeholder="Algo mais? Escreva aqui (opcional)..." style="width:100%;padding:10px 14px;border:2px solid var(--border);border-radius:12px;font-family:Poppins,sans-serif;font-size:0.9rem;resize:none;height:70px;outline:none;" onfocus="this.style.borderColor=&#39;var(--primary)&#39;" onblur="this.style.borderColor=&#39;var(--border)&#39;"></textarea>
+      <textarea id="rej-texto" placeholder="Algo mais? Escreva aqui (opcional)..." style="width:100%;padding:10px 14px;border:2px solid var(--border);border-radius:12px;font-family:Poppins,sans-serif;font-size:0.9rem;resize:none;height:70px;outline:none;" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border)'"></textarea>
     </div>
     <button onclick="confirmRejeicao()" style="width:100%;background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:white;border:none;border-radius:12px;padding:14px;font-size:1rem;font-weight:700;font-family:Nunito,sans-serif;cursor:pointer;">✅ Confirmar</button>
   </div>
@@ -3853,5 +3853,5 @@ window.addEventListener('DOMContentLoaded', async () => {
   await tryAutoLogin();
 });
 </script>
-
-</body></html>
+</body>
+</html>
