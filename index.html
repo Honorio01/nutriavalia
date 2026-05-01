@@ -1491,6 +1491,30 @@
 
 <script>
 // ============================================================
+// HELPERS DE FORMATAÇÃO DE TEXTO
+// ============================================================
+// Capitaliza cada palavra respeitando conectivos: "joão da silva" → "João da Silva"
+const CONECTIVOS_PT = ['de','da','do','das','dos','e','di','du','del','della','van','von','la','le','y'];
+function toTitleCase(str) {
+  if (!str) return '';
+  const palavras = str.toLowerCase().split(/(\s+)/); // mantém os espaços
+  return palavras.map((p, i) => {
+    if (/^\s+$/.test(p)) return p; // mantém espaços
+    if (!p) return p;
+    // primeira palavra sempre maiúscula, conectivos no meio ficam minúsculos
+    if (i > 0 && CONECTIVOS_PT.includes(p)) return p;
+    return p.charAt(0).toUpperCase() + p.slice(1);
+  }).join('');
+}
+// Capitaliza apenas a primeira letra: "arroz com feijão" → "Arroz com feijão"
+function toSentenceCase(str) {
+  if (!str) return '';
+  const trimmed = str.trim();
+  if (!trimmed) return '';
+  return trimmed[0].toUpperCase() + trimmed.slice(1).toLowerCase();
+}
+
+// ============================================================
 // SUPABASE CONFIG
 // ============================================================
 const SUPA_URL = 'https://hjfvxhtjruymspwspxpu.supabase.co';
@@ -2114,7 +2138,7 @@ function openModalCardapio(escolaId, diaSemana) {
     </div>
     <div style="display:grid;grid-template-columns:1fr auto;gap:1rem;align-items:end;">
       <div class="form-group" style="margin:0"><label>Nome do Prato</label>
-        <input type="text" id="m-nome" placeholder="Ex: Arroz com Feijão">
+        <input type="text" id="m-nome" placeholder="Ex: Arroz com feijão" oninput="if(this.value.length===1)this.value=this.value.toUpperCase()">
       </div>
       <div class="form-group" style="margin:0"><label>Emoji</label>
         <input type="text" id="m-emoji" value="🍽️" maxlength="4" style="width:70px;text-align:center;font-size:1.4rem;">
@@ -2154,12 +2178,12 @@ function previewImg(input) {
 function previewImgEdit(input) { previewImg(input); }
 
 async function savePrato() {
-  const nome = document.getElementById('m-nome').value.trim();
+  const nome = toSentenceCase(document.getElementById('m-nome').value.trim());
   if (!nome) { alert('Informe o nome do prato.'); return; }
   const escolaId = document.getElementById('m-escola-id').value;
   const dia = document.getElementById('m-dia').value;
   const data = document.getElementById('m-data').value;
-  const desc = document.getElementById('m-desc').value.trim();
+  const desc = toSentenceCase(document.getElementById('m-desc').value.trim());
   const emoji = document.getElementById('m-emoji').value.trim() || '🍽️';
 
   document.getElementById('m-saving').classList.remove('hidden');
@@ -2201,7 +2225,7 @@ async function openEditPrato(pratoId) {
   window._imgData = prato.foto_url || '';
   document.getElementById('modal-title').textContent = '✏️ Editar Prato';
   document.getElementById('modal-body').innerHTML = `
-    <div class="form-group"><label>Nome</label><input type="text" id="ep-nome" value="${prato.nome}"></div>
+    <div class="form-group"><label>Nome</label><input type="text" id="ep-nome" value="${prato.nome}" oninput="if(this.value.length===1)this.value=this.value.toUpperCase()"></div>
     <div class="form-group"><label>Descrição</label><textarea id="ep-desc">${prato.descricao||''}</textarea></div>
     <div class="form-group"><label>Emoji</label><input type="text" id="ep-emoji" value="${prato.emoji||'🍽️'}" maxlength="4"></div>
     <div class="form-group"><label>Foto</label>
@@ -2221,8 +2245,8 @@ async function openEditPrato(pratoId) {
 async function updatePrato(pratoId) {
   const prato = cache.pratos.find(p => p.id === pratoId);
   if (!prato) return;
-  const nome = document.getElementById('ep-nome').value.trim() || prato.nome;
-  const desc = document.getElementById('ep-desc').value.trim();
+  const nome = toSentenceCase(document.getElementById('ep-nome').value.trim()) || prato.nome;
+  const desc = toSentenceCase(document.getElementById('ep-desc').value.trim());
   const emoji = document.getElementById('ep-emoji').value.trim() || prato.emoji;
   let foto_url = window._imgData;
 
@@ -2855,7 +2879,7 @@ function renderLancamentoRapido() {
         </div>
         <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:1rem;">
           <div class="form-group"><label>Nome da Criança</label>
-            <input type="text" id="rapid-nome" placeholder="Ex: João Silva">
+            <input type="text" id="rapid-nome" placeholder="Ex: João Silva" onblur="this.value=toTitleCase(this.value)">
           </div>
           <div class="form-group"><label>Sexo</label>
             <select id="rapid-sexo">
@@ -2913,7 +2937,7 @@ function calcularRapidoPreview() {
 }
 
 async function salvarLancamentoRapido() {
-  const nome = document.getElementById('rapid-nome').value.trim();
+  const nome = toTitleCase(document.getElementById('rapid-nome').value.trim());
   const sexo = document.getElementById('rapid-sexo').value;
   const nasc = document.getElementById('rapid-nasc').value;
   const peso = parseFloat(document.getElementById('rapid-peso').value);
@@ -3149,7 +3173,7 @@ function openModalCrianca(id) {
   document.getElementById('modal-title').textContent = crianca ? '✏️ Editar Criança' : '👶 Cadastrar Criança';
   document.getElementById('modal-body').innerHTML = `
     <div class="form-group"><label>Nome</label>
-      <input type="text" id="cr-nome" value="${crianca?crianca.nome:''}" placeholder="Nome completo">
+      <input type="text" id="cr-nome" value="${crianca?crianca.nome:''}" placeholder="Nome completo" onblur="this.value=toTitleCase(this.value)">
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
       <div class="form-group" style="margin:0"><label>Sexo</label>
@@ -3191,7 +3215,7 @@ function filterCrTurmas() {
 }
 
 async function saveCrianca(id) {
-  const nome = document.getElementById('cr-nome').value.trim();
+  const nome = toTitleCase(document.getElementById('cr-nome').value.trim());
   if (!nome) { alert('Informe o nome.'); return; }
   const data = {
     nome,
@@ -3329,7 +3353,7 @@ function parseImportList() {
   const lines = txt.split('\n').map(l=>l.trim()).filter(Boolean);
   return lines.map(line => {
     const parts = line.split(/[;,\t]/).map(p=>p.trim());
-    const nome = parts[0];
+    const nome = toTitleCase(parts[0]||'');
     const sexo = (parts[1]||'').toUpperCase().startsWith('F') ? 'F' : 'M';
     let nasc = parts[2]||'';
     // Convert DD/MM/AAAA → AAAA-MM-DD
