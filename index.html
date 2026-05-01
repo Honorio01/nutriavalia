@@ -354,16 +354,22 @@ function dbDelete(store, id) { return openDB().then(d => new Promise((res,rej) =
 function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
 function hashPw(pw) { let h=0; for(let c of pw){h=((h<<5)-h)+c.charCodeAt(0);h|=0;} return h.toString(36); }
 
-// SEED default data
+// SEED default data — só cria superadmin se não existir, nunca apaga dados existentes
 async function seedData() {
-  const users = await dbGetAll('users');
-  if (users.length) return;
-  await dbPut('users', {id:'superadmin',name:'Super Admin',email:'admin@nutri.com',password:hashPw('admin123'),role:'superadmin',schoolId:null,createdAt:new Date().toISOString()});
-  const s1 = uid();
-  await dbPut('schools', {id:s1,name:'EMEI Girassol',city:'Maringá',state:'PR',createdAt:new Date().toISOString()});
-  const n1 = uid();
-  await dbPut('users', {id:n1,name:'Dra. Ana Lima',email:'ana@nutri.com',password:hashPw('ana123'),role:'nutritionist',schoolId:s1,createdAt:new Date().toISOString()});
-}
+  // Garante que o superadmin sempre existe com ID fixo
+  const existing = await dbGet('users', 'superadmin');
+  if (!existing) {
+    await dbPut('users', {
+      id:'superadmin',
+      name:'Super Admin',
+      email:'adriano.dsantos50@gmail.com',
+      password:hashPw('admin123'),
+      role:'superadmin',
+      schoolId:null,
+      createdAt:new Date().toISOString()
+    });
+  }
+}}
 
 // ===================== CONTEXT =====================
 const AppCtx = React.createContext(null);
@@ -456,10 +462,6 @@ function LoginPage({onLogin}) {
             <p style={{textAlign:'center',marginTop:16,fontSize:'0.82rem',color:'var(--muted)'}}>
               <span style={{color:'var(--green)',fontWeight:800,cursor:'pointer'}} onClick={()=>setForgot(true)}>Esqueci minha senha</span>
             </p>
-            <div style={{marginTop:20,background:'var(--bg)',borderRadius:10,padding:12,fontSize:'0.75rem',color:'var(--muted)'}}>
-              <b>Demo:</b> admin@nutri.com / admin123<br/>
-              <b>Nutricionista:</b> ana@nutri.com / ana123
-            </div>
           </form>
         ) : (
           <form onSubmit={handleForgot}>
