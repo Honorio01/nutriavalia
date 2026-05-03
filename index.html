@@ -1023,6 +1023,9 @@
   ::-webkit-scrollbar-track { background: var(--bg); }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>if(typeof pdfjsLib!=='undefined'){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}</script>
 </head>
 <body>
 
@@ -1289,7 +1292,10 @@
           <div class="page-title">👨‍👩‍👧 Turmas</div>
           <div class="page-subtitle">Gerencie as turmas por escola</div>
         </div>
-        <button class="btn btn-primary" onclick="openModalTurma()">+ Cadastrar Turma</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-secondary btn-sm" onclick="openImportTurmas()">📥 Importar Lista</button>
+          <button class="btn btn-primary" onclick="openModalTurma()">+ Cadastrar Turma</button>
+        </div>
       </div>
       <div class="filter-bar" style="margin-bottom:1rem;">
         <select id="turma-escola-filter" onchange="renderTurmas()">
@@ -1342,12 +1348,12 @@
         </select>
         <select id="imc-classificacao-filter" onchange="renderImcTab()" style="display:none;">
           <option value="">Todas as Classificações</option>
-          <option value="Magreza acentuada">🔴 Magreza acentuada</option>
-          <option value="Magreza">🟠 Magreza</option>
-          <option value="Eutrofia">🟢 Eutrofia (peso ideal)</option>
-          <option value="Sobrepeso">🟡 Sobrepeso</option>
-          <option value="Obesidade">🟠 Obesidade</option>
-          <option value="Obesidade grave">🔴 Obesidade grave</option>
+          <option value="Muito baixo peso">🔴 Muito baixo peso</option>
+          <option value="Baixo peso">🔴 Baixo peso</option>
+          <option value="Peso adequado">🟢 Peso adequado</option>
+          <option value="Risco para excesso de peso">🟡 Risco para excesso de peso</option>
+          <option value="Excesso de peso">🟠 Excesso de peso</option>
+          <option value="Obesidade">🔴 Obesidade</option>
         </select>
       </div>
 
@@ -2048,6 +2054,18 @@ function getAllVisiblePratos() {
   const cIds = getVisibleCardapios().map(c => c.id);
   return (cache.pratos || []).filter(p => cIds.includes(p.cardapio_id));
 }
+
+// Retorna prato com dia da semana e escola
+function getPratoComContexto(prato) {
+  const cardapio = (cache.cardapios||[]).find(c => c.id === prato.cardapio_id);
+  const escola = cardapio ? (cache.escolas||[]).find(e => e.id === cardapio.escola_id) : null;
+  return {
+    ...prato,
+    dia: cardapio ? cardapio.diaSemana || cardapio.dia_semana : '',
+    data: cardapio ? cardapio.data : '',
+    escolaNome: escola ? escola.nome : ''
+  };
+}
 function getVisibleVotos() {
   const ids = getVisibleEscolas().map(e => e.id);
   return (cache.votos || []).filter(v => ids.includes(v.escola_id));
@@ -2506,8 +2524,20 @@ function renderRelatorios() {
   const escolas = getVisibleEscolas();
   document.getElementById('rel-escola').innerHTML = '<option value="">Todas as Escolas</option>' + escolas.map(e=>`<option value="${e.id}">${e.nome}</option>`).join('');
   loadRelTurmas();
-  const allPratos = getAllVisiblePratos();
-  document.getElementById('rel-prato').innerHTML = '<option value="">Todos os Pratos</option>' + allPratos.map(p=>`<option value="${p.id}">${p.nome}</option>`).join('');
+  const allPratos = getAllVisiblePratos().map(getPratoComContexto);
+  // Agrupa por dia da semana para facilitar leitura
+  const DIAS_ORDEM = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
+  allPratos.sort((a,b) => {
+    const da = DIAS_ORDEM.indexOf(a.dia) >=0 ? DIAS_ORDEM.indexOf(a.dia) : 99;
+    const db = DIAS_ORDEM.indexOf(b.dia) >=0 ? DIAS_ORDEM.indexOf(b.dia) : 99;
+    if (da !== db) return da - db;
+    return a.nome.localeCompare(b.nome);
+  });
+  document.getElementById('rel-prato').innerHTML = '<option value="">Todos os Pratos</option>' +
+    allPratos.map(p => {
+      const dia = p.dia ? `[${p.dia}]` : '';
+      return `<option value="${p.id}">${p.emoji||'🍽️'} ${dia} ${p.nome}${p.escolaNome?' · '+p.escolaNome:''}</option>`;
+    }).join('');
   loadRelatorios();
 }
 
@@ -2573,7 +2603,7 @@ function getActiveFiltersBanner() {
   const tags = [];
   if (escolaId) { const e=(cache.escolas||[]).find(e=>e.id===escolaId); if(e) tags.push(`🏫 ${e.nome}`); }
   if (turmaId) { const t=(cache.turmas||[]).find(t=>t.id===turmaId); if(t) tags.push(`👨‍👩‍👧 ${t.nome} (${t.turno})`); }
-  if (pratoId) { const p=getAllVisiblePratos().find(p=>p.id===pratoId); if(p) tags.push(`🍽️ ${p.nome}`); }
+  if (pratoId) { const p=getAllVisiblePratos().find(p=>p.id===pratoId); if(p) { const ctx=getPratoComContexto(p); tags.push(`${p.emoji||'🍽️'} ${ctx.dia?'['+ctx.dia+'] ':''}${p.nome}`); } }
   const periodoLabels = {today:'📅 Hoje',week:'📅 Esta Semana',month:'📅 Este Mês',all:'📅 Todos os Períodos'};
   if (periodo === 'custom') {
     const d = document.getElementById('rel-data-especifica').value;
@@ -2613,7 +2643,8 @@ function renderRelPrato(votos,container) {
     const counts=[1,2,3,4,5].map(n=>pv.filter(v=>v.nota===n).length);
     const score = pv.length ? Math.round(pv.reduce((s,v)=>s+(scoreMap[v.nota]||0),0)/pv.length) : 0;
     const rejeicoes = pv.filter(v=>v.motivo_rejeicao).map(v=>v.motivo_rejeicao).join(' | ');
-    return {...p, counts, total:pv.length, score, rejeicoes};
+    const ctx = getPratoComContexto(p);
+    return {...p, ...ctx, counts, total:pv.length, score, rejeicoes};
   }).filter(p=>p.total>0).sort((a,b)=>b.score-a.score); // ordenado por aceitabilidade
   const banner = getActiveFiltersBanner();
   if (!pratoData.length) { container.innerHTML=banner+`<div class="empty-state"><div class="empty-state-icon">🍽️</div><div class="empty-state-msg">Nenhuma avaliação encontrada.</div></div>`; return; }
@@ -2622,12 +2653,22 @@ function renderRelPrato(votos,container) {
   const color5 = ['#7B1FA2','#C62828','#757575','#1565C0','#22C55E'];
   container.innerHTML=banner+`<div class="card"><div class="card-header"><div class="card-title">🍽️ Avaliação por Prato — Ordenado por Aceitabilidade</div></div><div class="card-body">
     ${pratoData.map((p,i)=>`<div style="margin-bottom:1.5rem;padding-bottom:1.5rem;border-bottom:${i<pratoData.length-1?'1px solid var(--border)':'none'}">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
-        <span style="font-size:1.3rem">${p.emoji||'🍽️'}</span>
-        <strong>${p.nome}</strong>
-        <span class="tag tag-primary">${p.total} votos</span>
-        <span class="tag ${p.score>=70?'tag-success':p.score>=40?'tag-warning':'tag-danger'}">${p.score}% aceitação</span>
-        ${i===0?'<span class="tag tag-success">🥇 Mais aceito</span>':i===pratoData.length-1?'<span class="tag tag-danger">📉 Menos aceito</span>':''}
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+        ${p.foto_url
+          ? `<img src="${p.foto_url}" alt="${p.nome}" style="width:48px;height:48px;border-radius:10px;object-fit:cover;flex-shrink:0;">`
+          : `<div style="width:48px;height:48px;border-radius:10px;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:1.6rem;flex-shrink:0;">${p.emoji||'🍽️'}</div>`}
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:3px;">
+            ${p.dia?`<span style="background:var(--primary-light);color:var(--primary-dark);padding:2px 8px;border-radius:12px;font-size:0.72rem;font-weight:700;">${p.dia}</span>`:''}
+            <strong>${p.nome}</strong>
+            ${p.escolaNome?`<span style="font-size:0.74rem;color:var(--text3);">· ${p.escolaNome}</span>`:''}
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <span class="tag tag-primary">${p.total} votos</span>
+            <span class="tag ${p.score>=70?'tag-success':p.score>=40?'tag-warning':'tag-danger'}">${p.score}% aceitação</span>
+            ${i===0?'<span class="tag tag-success">🥇 Mais aceito</span>':i===pratoData.length-1?'<span class="tag tag-danger">📉 Menos aceito</span>':''}
+          </div>
+        </div>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:8px">${p.counts.map((c,ci)=>`<div style="flex:1;text-align:center;background:${color5[ci]}15;border-radius:8px;padding:6px 4px">
         <div style="font-size:1.3rem">${face5[ci]}</div>
@@ -2756,27 +2797,62 @@ function calcIMC(peso, alturaCm) {
   return +(peso / (altura * altura)).toFixed(2);
 }
 
-function classifyIMC(imc, age, sexo) {
-  // Adultos (≥ 20 anos): faixas OMS padrão
-  if (age >= 20) {
-    if (imc < 17.0) return { label: 'Magreza acentuada', color: '#DC2626', icon: '🔴' };
-    if (imc < 18.5) return { label: 'Magreza', color: '#EA580C', icon: '🟠' };
-    if (imc < 25.0) return { label: 'Eutrofia', color: '#16A34A', icon: '🟢' };
-    if (imc < 30.0) return { label: 'Sobrepeso', color: '#CA8A04', icon: '🟡' };
-    if (imc < 40.0) return { label: 'Obesidade', color: '#EA580C', icon: '🟠' };
-    return { label: 'Obesidade grave', color: '#DC2626', icon: '🔴' };
-  }
+// Aproxima escore-Z a partir do IMC e da tabela SISVAN
+// Limites SISVAN: [< magrezaAc, magrezaAc-magreza, magreza-eutrofia, eutrofia-sobrepeso, sobrepeso-obesidade, > obesidade]
+// Mapeamos para os escore-Z OMS: < -3, -3 a -2, -2 a +1, +1 a +2, +2 a +3, > +3
+// Nomenclatura unificada PNAE/OMS para todos:
+const NUTRI_LABELS = {
+  muitoBaixo: { label: 'Muito baixo peso',         color: '#7C2D12', icon: '🔴' },
+  baixo:      { label: 'Baixo peso',               color: '#DC2626', icon: '🔴' },
+  adequado:   { label: 'Peso adequado',            color: '#16A34A', icon: '🟢' },
+  risco:      { label: 'Risco para excesso de peso', color: '#CA8A04', icon: '🟡' },
+  excesso:    { label: 'Excesso de peso',          color: '#EA580C', icon: '🟠' },
+  obesidade:  { label: 'Obesidade',                color: '#B91C1C', icon: '🔴' }
+};
 
-  // Crianças (5-19 anos): tabela SISVAN
-  const tab = SISVAN_IMC[sexo] && SISVAN_IMC[sexo][Math.max(5, Math.min(19, age))];
-  if (!tab) return { label: 'Sem dados p/ idade', color: '#6B7280', icon: '⚪' };
+// Classificação para crianças até 10 anos — escore-Z aproximado
+function classifyByEscoreZ(imc, age, sexo) {
+  // Para crianças menores que 5 anos, usa a tabela de 5 anos como referência mínima
+  const ageRef = Math.max(5, age);
+  const tab = SISVAN_IMC[sexo] && SISVAN_IMC[sexo][Math.min(10, ageRef)];
+  if (!tab) return { ...NUTRI_LABELS.adequado, label: 'Sem dados p/ idade', color: '#6B7280', icon: '⚪' };
   const [magrezaAc, magreza, eutrofia, sobrepeso, obesidade] = tab;
-  if (imc < magrezaAc) return { label: 'Magreza acentuada', color: '#DC2626', icon: '🔴' };
-  if (imc < magreza) return { label: 'Magreza', color: '#EA580C', icon: '🟠' };
-  if (imc <= eutrofia) return { label: 'Eutrofia', color: '#16A34A', icon: '🟢' };
-  if (imc <= sobrepeso) return { label: 'Sobrepeso', color: '#CA8A04', icon: '🟡' };
-  if (imc <= obesidade) return { label: 'Obesidade', color: '#EA580C', icon: '🟠' };
-  return { label: 'Obesidade grave', color: '#DC2626', icon: '🔴' };
+  // Mapeamento OMS para até 10 anos (escore-Z)
+  if (imc < magrezaAc)  return NUTRI_LABELS.muitoBaixo;   // < escore Z -3
+  if (imc < magreza)    return NUTRI_LABELS.baixo;        // ≥-3 a <-2
+  if (imc <= eutrofia)  return NUTRI_LABELS.adequado;     // ≥-2 a ≤+1
+  if (imc <= sobrepeso) return NUTRI_LABELS.risco;        // >+1 a ≤+2
+  if (imc <= obesidade) return NUTRI_LABELS.excesso;      // >+2 a ≤+3
+  return NUTRI_LABELS.obesidade;                          // > escore Z +3
+}
+
+// Classificação para 11+ anos (adolescentes 11-19 e adultos 20+)
+function classifyByIMC(imc, age, sexo) {
+  if (age >= 20) {
+    // Adultos OMS padrão — mas com nomenclatura unificada
+    if (imc < 17.0) return NUTRI_LABELS.muitoBaixo;
+    if (imc < 18.5) return NUTRI_LABELS.baixo;
+    if (imc < 25.0) return NUTRI_LABELS.adequado;
+    if (imc < 30.0) return NUTRI_LABELS.risco;
+    if (imc < 35.0) return NUTRI_LABELS.excesso;
+    return NUTRI_LABELS.obesidade;
+  }
+  // Adolescentes 11-19 — tabela SISVAN
+  const tab = SISVAN_IMC[sexo] && SISVAN_IMC[sexo][Math.min(19, age)];
+  if (!tab) return { ...NUTRI_LABELS.adequado, label: 'Sem dados p/ idade', color: '#6B7280', icon: '⚪' };
+  const [magrezaAc, magreza, eutrofia, sobrepeso, obesidade] = tab;
+  if (imc < magrezaAc)  return NUTRI_LABELS.muitoBaixo;
+  if (imc < magreza)    return NUTRI_LABELS.baixo;
+  if (imc <= eutrofia)  return NUTRI_LABELS.adequado;
+  if (imc <= sobrepeso) return NUTRI_LABELS.risco;
+  if (imc <= obesidade) return NUTRI_LABELS.excesso;
+  return NUTRI_LABELS.obesidade;
+}
+
+// Função principal — escolhe automaticamente entre escore-Z (até 10) e IMC SISVAN (11+)
+function classifyIMC(imc, age, sexo) {
+  if (age <= 10) return classifyByEscoreZ(imc, age, sexo);
+  return classifyByIMC(imc, age, sexo);
 }
 
 let imcTab = 'lista';
@@ -2938,18 +3014,17 @@ function renderLancamentoRapido() {
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;">
           <div class="form-group"><label>Peso (kg)</label>
-            <input type="number" id="rapid-peso" step="0.1" placeholder="Ex: 25.5">
+            <input type="number" id="rapid-peso" step="0.1" placeholder="Ex: 25.5" oninput="autoCalcRapido()">
           </div>
           <div class="form-group"><label>Altura (cm)</label>
-            <input type="number" id="rapid-altura" step="0.1" placeholder="Ex: 130">
+            <input type="number" id="rapid-altura" step="0.1" placeholder="Ex: 130" oninput="autoCalcRapido()">
           </div>
           <div class="form-group"><label>Data da Medição</label>
-            <input type="date" id="rapid-data" value="${new Date().toISOString().split('T')[0]}">
+            <input type="date" id="rapid-data" value="${new Date().toISOString().split('T')[0]}" oninput="autoCalcRapido()">
           </div>
         </div>
         <div id="rapid-result" style="display:none;background:var(--bg2);border-radius:12px;padding:1rem;margin-bottom:1rem;text-align:center;"></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-secondary" onclick="calcularRapidoPreview()">🧮 Calcular IMC</button>
           <button class="btn btn-primary" onclick="salvarLancamentoRapido()">💾 Salvar Medição</button>
           <button class="btn btn-outline btn-sm" onclick="limparLancamentoRapido()">🔄 Limpar</button>
         </div>
@@ -2958,26 +3033,27 @@ function renderLancamentoRapido() {
   `;
 }
 
-function calcularRapidoPreview() {
+function calcularRapidoPreview() { autoCalcRapido(); }
+
+// Cálculo automático no lançamento rápido
+function autoCalcRapido() {
   const peso = parseFloat(document.getElementById('rapid-peso').value);
   const altura = parseFloat(document.getElementById('rapid-altura').value);
-  const nasc = document.getElementById('rapid-nasc').value;
-  const sexo = document.getElementById('rapid-sexo').value;
+  const nasc = document.getElementById('rapid-nasc')?.value;
+  const sexo = document.getElementById('rapid-sexo')?.value;
   const data = document.getElementById('rapid-data').value;
-
-  if (!peso || !altura || !nasc) {
-    showToast('⚠️ Informe peso, altura e data de nascimento.', 'warning');
-    return;
-  }
+  const result = document.getElementById('rapid-result');
+  if (!peso || !altura || !nasc || !data) { result.style.display = 'none'; return; }
   const age = calcAge(nasc, data);
   const imc = calcIMC(peso, altura);
   const c = classifyIMC(imc, age, sexo);
-  document.getElementById('rapid-result').style.display = '';
-  document.getElementById('rapid-result').innerHTML = `
-    <div style="font-size:0.85rem;color:var(--text2);margin-bottom:6px;">Resultado da Medição</div>
-    <div style="font-family:Nunito,sans-serif;font-weight:900;font-size:2.2rem;color:${c.color};">${imc}</div>
-    <div style="margin:8px 0;background:${c.color}20;color:${c.color};padding:6px 14px;border-radius:20px;display:inline-block;font-weight:700;">${c.icon} ${c.label}</div>
-    <div style="font-size:0.78rem;color:var(--text2);">Idade: ${age} anos</div>
+  const metodo = age <= 10 ? 'Escore-Z (OMS até 10 anos)' : 'IMC/Idade (SISVAN/PNAE)';
+  result.style.display = '';
+  result.innerHTML = `
+    <div style="font-size:0.78rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;">Resultado da Medição</div>
+    <div style="font-family:Nunito,sans-serif;font-weight:900;font-size:2.4rem;color:${c.color};line-height:1;margin:6px 0;">${imc}</div>
+    <div style="margin:6px 0;background:${c.color}25;color:${c.color};padding:6px 16px;border-radius:20px;display:inline-block;font-weight:800;font-size:0.9rem;">${c.icon} ${c.label}</div>
+    <div style="font-size:0.74rem;color:var(--text3);">Idade: ${age} anos · ${metodo}</div>
   `;
 }
 
@@ -3399,39 +3475,45 @@ function openMedicaoModal(criancaId) {
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
       <div class="form-group" style="margin:0"><label>Peso (kg)</label>
-        <input type="number" id="med-peso" step="0.1" placeholder="Ex: 25.5">
+        <input type="number" id="med-peso" step="0.1" placeholder="Ex: 25.5" oninput="autoCalcMedicao('${criancaId}')">
       </div>
       <div class="form-group" style="margin:0"><label>Altura (cm)</label>
-        <input type="number" id="med-altura" step="0.1" placeholder="Ex: 130">
+        <input type="number" id="med-altura" step="0.1" placeholder="Ex: 130" oninput="autoCalcMedicao('${criancaId}')">
       </div>
     </div>
     <div class="form-group"><label>Data da Medição</label>
-      <input type="date" id="med-data" value="${new Date().toISOString().split('T')[0]}">
+      <input type="date" id="med-data" value="${new Date().toISOString().split('T')[0]}" oninput="autoCalcMedicao('${criancaId}')">
     </div>
     <div id="med-preview" style="display:none;background:var(--primary-light);border-radius:12px;padding:1rem;margin-bottom:1rem;text-align:center;"></div>
   `;
   document.getElementById('modal-footer').innerHTML = `
     <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
-    <button class="btn btn-secondary btn-sm" onclick="previewMedicao('${criancaId}')">🧮 Calcular IMC</button>
     <button class="btn btn-primary" onclick="saveMedicao('${criancaId}')">💾 Salvar Medição</button>
   `;
   document.getElementById('modal-overlay').classList.remove('hidden');
 }
 
-function previewMedicao(criancaId) {
+function previewMedicao(criancaId) { autoCalcMedicao(criancaId); }
+
+// Calcula IMC automaticamente ao digitar peso/altura/data
+function autoCalcMedicao(criancaId) {
   const crianca = (cache.criancas||[]).find(c => c.id === criancaId);
+  if (!crianca) return;
   const peso = parseFloat(document.getElementById('med-peso').value);
   const altura = parseFloat(document.getElementById('med-altura').value);
   const data = document.getElementById('med-data').value;
-  if (!peso || !altura) { showToast('⚠️ Informe peso e altura.', 'warning'); return; }
+  const preview = document.getElementById('med-preview');
+  if (!peso || !altura || !data) { preview.style.display = 'none'; return; }
   const age = calcAge(crianca.data_nascimento, data);
   const imc = calcIMC(peso, altura);
   const c = classifyIMC(imc, age, crianca.sexo);
-  document.getElementById('med-preview').style.display = '';
-  document.getElementById('med-preview').innerHTML = `
-    <div style="font-size:0.85rem;color:var(--text2);">IMC calculado:</div>
-    <div style="font-family:Nunito,sans-serif;font-weight:900;font-size:2rem;color:${c.color};">${imc}</div>
-    <div style="background:${c.color}20;color:${c.color};padding:5px 12px;border-radius:20px;display:inline-block;font-weight:700;">${c.icon} ${c.label}</div>
+  const metodo = age <= 10 ? 'Escore-Z (OMS até 10 anos)' : 'IMC/Idade (SISVAN/PNAE)';
+  preview.style.display = '';
+  preview.innerHTML = `
+    <div style="font-size:0.78rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;">IMC Calculado</div>
+    <div style="font-family:Nunito,sans-serif;font-weight:900;font-size:2.2rem;color:${c.color};line-height:1;margin:6px 0;">${imc}</div>
+    <div style="background:${c.color}25;color:${c.color};padding:6px 16px;border-radius:20px;display:inline-block;font-weight:800;font-size:0.9rem;">${c.icon} ${c.label}</div>
+    <div style="margin-top:8px;font-size:0.72rem;color:var(--text3);">${age} anos · ${metodo}</div>
   `;
 }
 
@@ -3464,9 +3546,9 @@ function openImportCriancas() {
   document.getElementById('modal-title').textContent = '📥 Importar Lista de Crianças';
   document.getElementById('modal-body').innerHTML = `
     <div style="background:var(--primary-light);border-radius:12px;padding:14px;margin-bottom:1rem;font-size:0.85rem;color:var(--text2);">
-      💡 Cole a lista de crianças com o formato:<br>
-      <code style="background:white;padding:6px 10px;border-radius:6px;display:inline-block;margin-top:6px;font-size:0.78rem;">Nome;Sexo (M/F);Data Nascimento (DD/MM/AAAA)</code><br>
-      Uma criança por linha. Sexo e data são opcionais — você pode preencher só os nomes.
+      💡 Importe arquivo <strong>Excel (.xlsx)</strong>, <strong>CSV (.csv)</strong> ou cole texto manualmente.<br>
+      <strong>Colunas esperadas:</strong> <code style="background:white;padding:3px 8px;border-radius:6px;font-size:0.78rem;">Nome | Sexo (M/F) | Data Nascimento</code><br>
+      <button onclick="downloadModeloPlanilha()" style="background:var(--primary);color:white;border:none;padding:6px 12px;border-radius:8px;font-size:0.78rem;font-weight:600;cursor:pointer;margin-top:8px;">⬇️ Baixar Modelo de Planilha</button>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
       <div class="form-group" style="margin:0"><label>Escola</label>
@@ -3479,9 +3561,26 @@ function openImportCriancas() {
         </select>
       </div>
     </div>
+
     <div class="form-group">
-      <label>Lista (uma criança por linha)</label>
-      <textarea id="imp-lista" style="width:100%;min-height:200px;font-family:monospace;font-size:0.85rem;padding:12px;border:2px solid var(--border);border-radius:10px;resize:vertical;" placeholder="João Silva;M;15/03/2018&#10;Maria Souza;F;22/07/2017&#10;Pedro Santos;M;10/01/2019"></textarea>
+      <label>📂 Selecionar Arquivo (Excel ou CSV)</label>
+      <div onclick="document.getElementById('imp-file').click()" style="border:2px dashed var(--border);border-radius:12px;padding:1.5rem;text-align:center;cursor:pointer;background:var(--bg);transition:all 0.2s;" onmouseover="this.style.borderColor='var(--primary)';this.style.background='var(--primary-light)'" onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--bg)'">
+        <div style="font-size:2.5rem;margin-bottom:6px;">📊</div>
+        <div style="font-weight:700;color:var(--text);font-size:0.95rem;">Clique para selecionar um arquivo</div>
+        <div style="font-size:0.78rem;color:var(--text2);margin-top:4px;">Aceita: .xlsx, .xls, .csv, .pdf</div>
+        <div id="imp-file-name" style="font-size:0.82rem;color:var(--primary);font-weight:700;margin-top:8px;"></div>
+      </div>
+      <input type="file" id="imp-file" accept=".xlsx,.xls,.csv,.pdf" style="display:none" onchange="handleImportFile(this)">
+    </div>
+
+    <div style="text-align:center;margin:1rem 0;font-size:0.8rem;color:var(--text3);position:relative;">
+      <span style="background:var(--card);padding:0 12px;position:relative;z-index:1;">ou cole manualmente</span>
+      <div style="position:absolute;top:50%;left:0;right:0;height:1px;background:var(--border);"></div>
+    </div>
+
+    <div class="form-group">
+      <label>📝 Colar Lista (uma criança por linha)</label>
+      <textarea id="imp-lista" style="width:100%;min-height:120px;font-family:monospace;font-size:0.85rem;padding:12px;border:2px solid var(--border);border-radius:10px;resize:vertical;" placeholder="João Silva;M;15/03/2018&#10;Maria Souza;F;22/07/2017"></textarea>
     </div>
     <div id="imp-preview" style="font-size:0.85rem;color:var(--text2);"></div>
   `;
@@ -3491,6 +3590,96 @@ function openImportCriancas() {
     <button class="btn btn-primary" onclick="confirmImport()">📥 Importar</button>
   `;
   document.getElementById('modal-overlay').classList.remove('hidden');
+}
+
+// Baixa um modelo .xlsx de exemplo
+function downloadModeloPlanilha() {
+  if (typeof XLSX === 'undefined') { showToast('⚠️ Biblioteca não carregada', 'warning'); return; }
+  const dados = [
+    ['Nome', 'Sexo', 'Data Nascimento'],
+    ['João da Silva', 'M', '15/03/2018'],
+    ['Maria de Souza', 'F', '22/07/2017'],
+    ['Pedro dos Santos', 'M', '10/01/2019']
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(dados);
+  ws['!cols'] = [{ wch: 30 }, { wch: 8 }, { wch: 18 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Crianças');
+  XLSX.writeFile(wb, 'modelo_importacao_criancas.xlsx');
+  showToast('✅ Modelo baixado!', 'success');
+}
+
+// Lê o arquivo selecionado (Excel/CSV/PDF) e popula o textarea
+async function handleImportFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('imp-file-name').textContent = '📎 ' + file.name;
+  const ext = file.name.toLowerCase().split('.').pop();
+
+  try {
+    let linhas = [];
+    if (ext === 'pdf') {
+      const txt = await readPDFFile(file);
+      linhas = parsePdfCriancas(txt);
+    } else {
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(new Uint8Array(data), { type: 'array', cellDates: true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: 'dd/mm/yyyy' });
+      let startRow = 0;
+      if (rows[0]) {
+        const firstLine = rows[0].join(' ').toLowerCase();
+        if (firstLine.includes('nome') || firstLine.includes('sexo') || firstLine.includes('nasc')) startRow = 1;
+      }
+      for (let i = startRow; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || !row[0] || String(row[0]).trim() === '') continue;
+        const nome = String(row[0]).trim();
+        const sexo = row[1] ? String(row[1]).trim() : '';
+        let nasc = row[2] ? String(row[2]).trim() : '';
+        if (row[2] instanceof Date) {
+          const d = row[2];
+          nasc = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+        }
+        linhas.push([nome, sexo, nasc].filter(Boolean).join(';'));
+      }
+    }
+    document.getElementById('imp-lista').value = linhas.join('\n');
+    previewImport();
+    showToast(`✅ ${linhas.length} linha(s) lida(s)`, 'success');
+  } catch(err) {
+    showToast('❌ Erro ao ler arquivo: ' + err.message, 'error');
+  }
+}
+
+// Tenta extrair crianças do texto bruto do PDF
+function parsePdfCriancas(txt) {
+  const linhas = [];
+  // Padrão: nome ... [M ou F] ... DD/MM/AAAA
+  const datePattern = /\b(\d{1,2}\/\d{1,2}\/\d{4})\b/;
+  const sexPattern = /\b([MF])\b/;
+  const lines = txt.split(/[\n\r]+/).map(l => l.trim()).filter(Boolean);
+  for (const line of lines) {
+    const dataMatch = line.match(datePattern);
+    if (!dataMatch) {
+      // Sem data — pode ser só nome
+      if (/^[A-Za-zÀ-ÿ\s]{4,}$/.test(line.trim())) {
+        linhas.push(line.trim());
+      }
+      continue;
+    }
+    const data = dataMatch[1];
+    let resto = line.replace(data, '').trim();
+    const sexMatch = resto.match(/\s([MF])\s|\s([MF])$|^([MF])\s/);
+    let sexo = '';
+    if (sexMatch) {
+      sexo = (sexMatch[1] || sexMatch[2] || sexMatch[3]).trim();
+      resto = resto.replace(sexMatch[0], ' ').trim();
+    }
+    const nome = resto.replace(/[;,\t|]+/g, ' ').trim();
+    if (nome) linhas.push([nome, sexo, data].filter(Boolean).join(';'));
+  }
+  return linhas;
 }
 
 function parseImportList() {
@@ -3696,6 +3885,189 @@ async function deleteTurma(id) {
   if(!confirm('Excluir esta turma?'))return;
   try { await supa.delete(`turmas?id=eq.${id}`); cache.turmas=(cache.turmas||[]).filter(t=>t.id!==id); saveCache(); renderTurmas(); showToast('🗑️ Turma excluída.','info'); }
   catch(e){showToast('❌ Erro: '+e.message,'error');}
+}
+
+// ── Importação de turmas em lote ──
+function openImportTurmas() {
+  const escolas = getVisibleEscolas();
+  document.getElementById('modal-title').textContent = '📥 Importar Lista de Turmas';
+  document.getElementById('modal-body').innerHTML = `
+    <div style="background:var(--primary-light);border-radius:12px;padding:14px;margin-bottom:1rem;font-size:0.85rem;color:var(--text2);">
+      💡 Importe arquivo <strong>Excel (.xlsx)</strong>, <strong>CSV</strong> ou <strong>PDF</strong>.<br>
+      <strong>Colunas esperadas:</strong> <code style="background:white;padding:3px 8px;border-radius:6px;font-size:0.78rem;">Nome da Turma | Turno | Nº Alunos</code><br>
+      <button onclick="downloadModeloTurmas()" style="background:var(--primary);color:white;border:none;padding:6px 12px;border-radius:8px;font-size:0.78rem;font-weight:600;cursor:pointer;margin-top:8px;">⬇️ Baixar Modelo de Planilha</button>
+    </div>
+    <div class="form-group"><label>Escola</label>
+      <select id="imp-tu-escola">${escolas.map(e=>`<option value="${e.id}">${e.nome}</option>`).join('')}</select>
+    </div>
+    <div class="form-group">
+      <label>📂 Selecionar Arquivo (Excel, CSV ou PDF)</label>
+      <div onclick="document.getElementById('imp-tu-file').click()" style="border:2px dashed var(--border);border-radius:12px;padding:1.5rem;text-align:center;cursor:pointer;background:var(--bg);transition:all 0.2s;" onmouseover="this.style.borderColor='var(--primary)';this.style.background='var(--primary-light)'" onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--bg)'">
+        <div style="font-size:2.5rem;margin-bottom:6px;">📊</div>
+        <div style="font-weight:700;color:var(--text);font-size:0.95rem;">Clique para selecionar um arquivo</div>
+        <div style="font-size:0.78rem;color:var(--text2);margin-top:4px;">Aceita: .xlsx, .xls, .csv, .pdf</div>
+        <div id="imp-tu-file-name" style="font-size:0.82rem;color:var(--primary);font-weight:700;margin-top:8px;"></div>
+      </div>
+      <input type="file" id="imp-tu-file" accept=".xlsx,.xls,.csv,.pdf" style="display:none" onchange="handleImportTurmasFile(this)">
+    </div>
+    <div style="text-align:center;margin:1rem 0;font-size:0.8rem;color:var(--text3);position:relative;">
+      <span style="background:var(--card);padding:0 12px;position:relative;z-index:1;">ou cole manualmente</span>
+      <div style="position:absolute;top:50%;left:0;right:0;height:1px;background:var(--border);"></div>
+    </div>
+    <div class="form-group">
+      <label>📝 Lista de Turmas (uma por linha)</label>
+      <textarea id="imp-tu-lista" style="width:100%;min-height:120px;font-family:monospace;font-size:0.85rem;padding:12px;border:2px solid var(--border);border-radius:10px;resize:vertical;" placeholder="1º Ano A;Matutino;25&#10;2º Ano B;Vespertino;30&#10;Maternal I;Integral;15"></textarea>
+    </div>
+    <div id="imp-tu-preview" style="font-size:0.85rem;color:var(--text2);"></div>
+  `;
+  document.getElementById('modal-footer').innerHTML = `
+    <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+    <button class="btn btn-secondary btn-sm" onclick="previewImportTurmas()">👀 Pré-visualizar</button>
+    <button class="btn btn-primary" onclick="confirmImportTurmas()">📥 Importar</button>
+  `;
+  document.getElementById('modal-overlay').classList.remove('hidden');
+}
+
+function downloadModeloTurmas() {
+  if (typeof XLSX === 'undefined') { showToast('⚠️ Biblioteca não carregada', 'warning'); return; }
+  const dados = [
+    ['Nome da Turma', 'Turno', 'Número de Alunos'],
+    ['1º Ano A', 'Matutino', 25],
+    ['2º Ano B', 'Vespertino', 30],
+    ['Maternal I', 'Integral', 15],
+    ['Pré II', 'Matutino', 20]
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(dados);
+  ws['!cols'] = [{ wch: 25 }, { wch: 14 }, { wch: 18 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Turmas');
+  XLSX.writeFile(wb, 'modelo_importacao_turmas.xlsx');
+  showToast('✅ Modelo baixado!', 'success');
+}
+
+async function handleImportTurmasFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('imp-tu-file-name').textContent = '📎 ' + file.name;
+  const ext = file.name.toLowerCase().split('.').pop();
+  try {
+    let linhas = [];
+    if (ext === 'pdf') {
+      const txt = await readPDFFile(file);
+      linhas = parsePdfTurmas(txt);
+    } else {
+      // Excel/CSV
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(new Uint8Array(data), { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false });
+      let startRow = 0;
+      if (rows[0]) {
+        const firstLine = rows[0].join(' ').toLowerCase();
+        if (firstLine.includes('turma') || firstLine.includes('nome') || firstLine.includes('turno')) startRow = 1;
+      }
+      for (let i = startRow; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row || !row[0] || String(row[0]).trim() === '') continue;
+        const nome = String(row[0]).trim();
+        const turno = row[1] ? String(row[1]).trim() : 'Matutino';
+        const alunos = row[2] ? String(row[2]).trim() : '';
+        linhas.push([nome, turno, alunos].filter(Boolean).join(';'));
+      }
+    }
+    document.getElementById('imp-tu-lista').value = linhas.join('\n');
+    previewImportTurmas();
+    showToast(`✅ ${linhas.length} turma(s) lida(s)`, 'success');
+  } catch(err) {
+    showToast('❌ Erro ao ler arquivo: ' + err.message, 'error');
+  }
+}
+
+// Lê texto de PDF
+async function readPDFFile(file) {
+  if (typeof pdfjsLib === 'undefined') throw new Error('Biblioteca PDF não carregada');
+  const data = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data }).promise;
+  let texto = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items.map(it => it.str).join(' ');
+    texto += pageText + '\n';
+  }
+  return texto;
+}
+
+// Tenta extrair turmas do texto bruto do PDF
+function parsePdfTurmas(txt) {
+  const linhas = [];
+  const turnos = ['Matutino','Vespertino','Noturno','Integral'];
+  // Procura por padrões "Nome ... Turno"
+  const lines = txt.split(/[\n\r]+/).map(l => l.trim()).filter(Boolean);
+  for (const line of lines) {
+    // Detecta turno na linha
+    const turnoEncontrado = turnos.find(t => new RegExp('\\b'+t+'\\b','i').test(line));
+    if (turnoEncontrado) {
+      // Tenta separar nome da turma do turno
+      const partes = line.split(new RegExp('\\b'+turnoEncontrado+'\\b','i'));
+      const nome = partes[0].trim().replace(/[;,\\t|]+$/, '').trim();
+      // Procura número de alunos no resto
+      const alunos = (partes[1]||'').match(/\d+/);
+      if (nome) linhas.push(`${nome};${turnoEncontrado};${alunos?alunos[0]:''}`);
+    }
+  }
+  return linhas;
+}
+
+function parseImportTurmasList() {
+  const txt = document.getElementById('imp-tu-lista').value;
+  const lines = txt.split('\n').map(l=>l.trim()).filter(Boolean);
+  return lines.map(line => {
+    const parts = line.split(/[;,\t|]/).map(p=>p.trim());
+    const nome = toTitleCase(parts[0] || '');
+    let turno = (parts[1] || 'Matutino').trim();
+    // Normaliza turno
+    const turnoLower = turno.toLowerCase();
+    if (turnoLower.startsWith('mat')) turno = 'Matutino';
+    else if (turnoLower.startsWith('vesp') || turnoLower.startsWith('tar')) turno = 'Vespertino';
+    else if (turnoLower.startsWith('not')) turno = 'Noturno';
+    else if (turnoLower.startsWith('int')) turno = 'Integral';
+    else turno = 'Matutino';
+    const num_alunos = parseInt(parts[2]) || null;
+    return { nome, turno, num_alunos };
+  }).filter(t => t.nome);
+}
+
+function previewImportTurmas() {
+  const list = parseImportTurmasList();
+  if (!list.length) {
+    document.getElementById('imp-tu-preview').innerHTML = '<div style="color:var(--danger)">⚠️ Lista vazia ou formato inválido.</div>';
+    return;
+  }
+  document.getElementById('imp-tu-preview').innerHTML = `<strong>${list.length} turma(s) encontrada(s):</strong>
+    <div style="max-height:140px;overflow-y:auto;background:var(--bg2);border-radius:8px;padding:10px;margin-top:6px;">
+      ${list.slice(0,30).map(t=>`<div>👨‍👩‍👧 <strong>${t.nome}</strong> — ${t.turno}${t.num_alunos?` · ${t.num_alunos} alunos`:''}</div>`).join('')}
+      ${list.length>30?`<div style="font-style:italic;color:var(--text3)">...e mais ${list.length-30}</div>`:''}
+    </div>`;
+}
+
+async function confirmImportTurmas() {
+  const list = parseImportTurmasList();
+  if (!list.length) { showToast('⚠️ Lista vazia.', 'warning'); return; }
+  const escolaId = document.getElementById('imp-tu-escola').value;
+  if (!escolaId) { showToast('⚠️ Selecione uma escola.', 'warning'); return; }
+  showToast(`⏳ Importando ${list.length} turma(s)...`, 'info');
+  let ok = 0, fail = 0;
+  for (const t of list) {
+    try {
+      const [nova] = await supa.post('turmas', { ...t, escola_id: escolaId });
+      cache.turmas = cache.turmas || [];
+      cache.turmas.push(nova);
+      ok++;
+    } catch(e) { fail++; }
+  }
+  saveCache(); closeModal(); renderTurmas();
+  showToast(`✅ ${ok} turma(s) importada(s)${fail?`, ${fail} falharam`:''}.`, ok>0?'success':'warning');
 }
 
 // ============================================================
